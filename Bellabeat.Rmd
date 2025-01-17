@@ -1,0 +1,312 @@
+---
+title: "Bellabeat Case Study"
+author: "Graycie Nel Muñoz"
+date: "2025-01-11"
+output: html_document
+---
+
+## About the Company
+Bellabeat Company is a high-tech manufacturer of health-focused products for women. Their techonology have empowered women with knowledge about their own health and habits by providing them data about their sleep, activity, stress, and reproductive health.
+
+## Business Task
+The goal is to analyze consumer trends in order to unlock more opportunity for growth for Bellabeat.
+
+There are three questions to consider during analysis:
+
+1. What are some trends in smart device usage?
+2. How could these trends apply to Bellabeat customers?
+3. How could these trends help influence Bellabeat marketing strategy?
+
+## Setting up my Environment
+
+```{r Installing Packages}
+install.packages("tidyverse")
+library(tidyverse)
+install.packages("here")
+library(here)
+```
+I will be using these data. They have been viewed at Microsoft Excel and the original files were renamed for convenience.
+```{r Loading data}
+minute_mets <- read.csv("minute_mets.csv")
+hourly_calories <- read.csv("hourly_calories.csv")
+hourly_intensities <- read.csv("hourly_intensities.csv")
+hourly_steps <- read.csv("hourly_steps.csv")
+daily_activity <- read.csv("daily_activity.csv")
+```
+
+## Data Cleaning
+I checked each sheets first in order to familiarize myself with what i'm dealing with and what needs to be cleaned.
+
+```{r Checking each dataframe}
+head(hourly_calories)
+head(hourly_intensities)
+head(hourly_steps)
+head(minute_mets)
+str(daily_activity)
+str(sleep)
+```
+
+Activity Hour needs to be reformatted. I am going to clean and change the format at the same time. Additionally, nulls and duplicates have been dropped. The entire dataframe was filteredw with Ids containing exactly 10 characters in order to eliminate the possible data entry error or ID length being less than or more than 10.
+
+A rechecking of the dataframe has been inputted as well for easy checking of the newly created dataframe.
+
+```{r Initial Cleaning of each dataframe}
+
+calories_cleaned <- hourly_calories %>%  
+  drop_na() %>% 
+  distinct() %>% 
+  mutate(ActivityHour = mdy_hms(ActivityHour, tz = Sys.timezone())) %>%
+  filter(nchar(Id) == 10) 
+head(calories_cleaned)
+
+
+intensities_cleaned <- hourly_intensities %>% 
+  drop_na() %>% 
+  distinct() %>% 
+  mutate(ActivityHour = mdy_hms(ActivityHour, tz = Sys.timezone())) %>% 
+  filter(nchar(Id) == 10)
+head(intensities_cleaned)
+
+
+steps_cleaned <- hourly_steps %>% 
+  drop_na() %>% 
+  distinct() %>% 
+  mutate(ActivityHour = mdy_hms(ActivityHour, tz = Sys.timezone())
+  ) %>% 
+  filter(nchar(Id) == 10)
+head(steps_cleaned)
+
+minute_mets_cleaned <- minute_mets %>% 
+  drop_na() %>% 
+  distinct() %>% 
+  mutate(ActivityMinute = mdy_hms(ActivityMinute, tz = Sys.timezone())
+  ) %>% 
+  filter(nchar(Id) == 10)
+head(minute_mets_cleaned)
+
+daily_activity_clean <- daily_activity %>% 
+  drop_na() %>% 
+  distinct() %>% 
+  mutate(ActivityDate = mdy(ActivityDate)) %>% 
+  filter(nchar(Id) == 10) 
+str(daily_activity_clean)
+```
+
+I have ddecided to focus on the hourly data this time in order to look at how the customers usually spend their days. For that, I will be converting any minutes data to hours (METs by Minute).
+
+```{r converting Minutes to Hours}
+mets <- minute_mets_cleaned %>% 
+  mutate(
+    ActivityHour = floor_date(ActivityMinute, unit = "hour")) %>% 
+  group_by(ActivityHour) %>%
+  summarise(AverageMETs = mean(METs))
+head(mets)
+```
+## Summarizing the data
+There are some columns that I wouldn't need. I have grouped them by Activity Hour. This means that the vales each activity hour is the mean of all the data of the users. This will allow me to picture whan an average user Bellabeat product is like.
+
+```{r summarizing the data}
+calories <- calories_cleaned %>% 
+  group_by(ActivityHour) %>% 
+  summarise(AverageCalories = mean(Calories))
+head(calories)
+
+intensities <- intensities_cleaned %>% 
+  group_by(ActivityHour) %>% 
+  summarise(average_hourly_intensity = mean(TotalIntensity))
+head(intensities)
+
+steps <- steps_cleaned %>% 
+  group_by(ActivityHour) %>% 
+  summarise(Average_Steps = mean(StepTotal))
+head(steps)
+
+```
+
+Since I to look into how the users spend their days. For that, I have to separate the date from the time and then summarize the data.
+
+```{r Separating Date and Time}
+calories <- calories %>% 
+  mutate(
+    Date = as.Date(ActivityHour),
+    Hour = format(ActivityHour, format = "%H:%M:%S")
+  ) %>% 
+  group_by(Hour) %>%
+  summarize(AverageCalories = mean(AverageCalories))
+head(calories)
+
+intensities <- intensities %>% 
+  mutate(
+    Date = as.Date(ActivityHour),
+    Hour = format(ActivityHour, format = "%H:%M:%S")
+  ) %>% 
+  group_by(Hour) %>% 
+  summarize(AverageHourlyIntensity = mean(average_hourly_intensity))
+head(intensities)
+
+steps <- steps %>% 
+  mutate(
+    Date = as.Date(ActivityHour),
+    Hour = format(ActivityHour, format = "%H:%M:%S")
+  ) %>% 
+  group_by(Hour) %>% 
+  summarize(AverageSteps = mean(Average_Steps))
+head(steps)
+
+mets <- mets %>% 
+  mutate(
+    Date = as.Date(ActivityHour),
+    Hour = format(ActivityHour, format = "%H:%M:%S")
+  ) %>% 
+  group_by(Hour) %>% 
+  summarize(AverageMETs = mean(AverageMETs))
+head(mets)
+```
+
+For convenience, I am making one dataframe to combine all data of the user.
+
+```{r Combining all data}
+hourly_data <- mets %>% 
+  left_join(calories, by = "Hour") %>% 
+  left_join(intensities, by = "Hour") %>% 
+  left_join(steps, by = "Hour")
+head(hourly_data)
+str(hourly_data)
+```
+## Visualizations
+
+I'll start visualizing the average day of a Bellabeat user using all the metrics available.
+
+```{r Plot all data}
+ggplot(data = hourly_data, aes(x=Hour)) +
+  geom_line(mapping=aes(y= AverageSteps, group = 1, color = "Steps"))+
+  geom_line(mapping=aes(y=AverageMETs, group = 1, color = "METs"))+
+  geom_line(mapping=aes(y=AverageCalories, group = 1, color = "Calories")) +
+  geom_line(mapping= aes(y= AverageHourlyIntensity, group = 1, color = "Intensity")) +
+  scale_color_manual(name = "Legend", 
+                   labels = c("Calories", "Intensity", "METs", "Steps"),
+                   values = c("orange","green","skyblue","purple"))+
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs (title = "The Average Day of a Bellabeat Woman", x = "Hour of the Day", y = "Metrics")
+
+```
+Each variable has the same movement but it's difficult to see because the scale that the steps took. So, the following are each variables alone.
+
+### Intensity
+```{r Plot Intensity}
+ggplot(data = hourly_data, aes(x=Hour)) +
+  geom_line(mapping= aes(y= AverageHourlyIntensity, group = 1, color = "Intensity")) +
+   scale_color_manual(name = "Legend",
+                      values = c("Intensity" = "green"))+
+  theme(axis.text.x = element_text(angle = 90))+
+labs (title = "The Average Intensity of Bellabeat Women", x = "Hour of the Day", y = "Intensity")
+```
+Steep increase from 4am to 8am, suggests that some of the users starts exercising during these hours. The drop from 2pm to 3pm suggests that this one hour window is when the users stops for a rest, perhaps in preparation for the upcoming exercise session for the following hour. The intensity peaks at 6pm, suggesting that this is the hour of 5pm to 6pm is when users are doing most of their workout. 
+
+### Steps
+```{r Plot Steps}
+ggplot(data = hourly_data, aes(x=Hour)) +
+  geom_line(mapping=aes(y= AverageSteps, color="Steps", group = 1))+
+  scale_color_manual(name = "Legend",
+                     values = c("Steps" = "violet"))+
+  theme(axis.text.x = element_text(angle = 90))+
+  labs (title = "The Average Steps of Bellabeat Women", x = "Hour of the Day", y = "Steps")
+
+
+```
+The same exact graph as intensity. This leads me to think that the users are most likely moving about during these hours. They could be doing a morning jog, or the treadmill; anything that doesn't involve a static workout such as push ups or bicep curls.
+
+### Calories
+
+```{r Plot Calories}
+ggplot(data = hourly_data, aes(x=Hour)) +
+  geom_line(mapping=aes(y=AverageCalories, color="Calories", group = 1)) +
+  scale_color_manual(name = "Legend",
+                     values = c("Calories" = "orange"))+
+  labs (title = "The Average Calories Burned by Bellabeat Women", x = "Hour of the Day", y = "Calories")+
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+
+### Mets
+
+```{r Plotting METs}
+ggplot(data = hourly_data, aes(x=Hour)) +
+  geom_line(mapping=aes(y=AverageMETs, color = "METs", group = 1))+
+    scale_color_manual(name = "Legend",
+                       values = c("METs" = "skyblue"))+
+labs (title = "The Average METs of Bellabeat Women", x = "Hour of the Day", y = "Steps")+
+theme(axis.text.x = element_text(angle = 90))
+
+```
+Looking at the METs can reveal some interesting things. 
+
+![MET](https://www.sciencedirect.com/topics/medicine-and-dentistry/metabolic-equivalent) is physiological concept comparing the energy expenditure of physical activities with energy expenditure at rest. This is basically an indication of how much energy you've used.
+
+A research was done compiling the METs of common recreational activities. We have surmised before that people's exercises generally starts at 4am, and that their activities seems to be something that involves taking steps. 
+
+The chart above that the METs around this time is at 10. According to the 2011 Compedium of Physical Acitivities, the related activities that are around 10 METs includes bicycling at 14-15 mph and  running at 9 min/mile, or competitive sports. The higher METs could be from intense work out or training.
+
+_Here is the list:_
+![](https://cdn-links.lww.com/permalink/mss/a/mss_43_8_2011_06_13_ainsworth_202093_sdc1.pdf)
+
+However, I believe we still need more data to support this assumption.
+
+### Checking for the activity of the users
+```{r Activity Type}
+activity_users <- daily_activity_clean %>% 
+  summarise(
+    "Very Active" = mean(VeryActiveMinutes/60),
+    "Fairly Active" = mean(FairlyActiveMinutes)/60,
+    "Lightly Active" = mean(LightlyActiveMinutes/60),
+  ) %>% 
+  pivot_longer(cols = everything(), names_to = "ActivityType", values_to = "Hours")
+
+ggplot(data = activity_users) +
+  geom_col(aes(x=ActivityType, y = Hours, fill = ActivityType))+
+  scale_fill_manual(name = "Activity Type", labels = c("Fairly Active", "Lightly Active", "Very Active"),
+ values = c("yellow", "green", "red"))+
+  labs(title = "Activity of Users", y="Hours Active")
+```
+
+This shows that the users are doing 3 hours of light activities which is still consistent with our assumption that our users might be into jogging, cycling, or sports. I will check the distance logged in order to check if it will show any deviation.
+
+```{r Distance}
+distance_users <- daily_activity_clean %>% 
+  summarise(
+    "Very Active" = mean(VeryActiveDistance),
+    "Fairly Active" = mean(ModeratelyActiveDistance),
+    "Lightly Active" = mean(LightActiveDistance),
+  ) %>% 
+  pivot_longer(cols = everything(), names_to = "DistanceType", values_to = "Hours")
+
+ggplot(data = distance_users) +
+  geom_col(aes(x=DistanceType, y = Hours, fill = DistanceType))+
+  scale_fill_manual(name = "Distance Type", labels = c("Fairly Active", "Lightly Active", "Very Active"),
+ values = c("yellow", "green", "red"))+
+  labs(title = "Activity of Users", y="Hours Spent", x = "Distance Type")
+```
+This chart shows that on average, users are doing Light Activity covering over distances for more than three hours. This is consistent with our previous assumption regarding the possibility of biking and jogging. There seem to be more hours spent on very active distance as well. This could explain the spikes in METs and those hours are likely spent doing intense training in a short amount of time. 
+
+## Conclusion
+
+These are some things we can conclude from the data
+
+* Users will start their activities between 4am to 7am.
+* There is a drop in activity between 2pm to 3pm, which is likely a rest period for the next few hours of more activity.
+* Activities drops after 7pm, suggesting that this is in preparation.
+* The data suggests that the spikes in activity may be related to the user covering distances. This is in consideration of the trend in Step Counts, Intensity, METs, and Activity Type. 
+
+
+## Recommendations
+
+* Consider looking into developing cycling or jogging gears. 
+* Take advantage of the downtime between 2pm to 3pm and after 7pm. Promotional contents could be posted online during these hours since people are less likely doing an activity.
+
+## For Future Analysis
+* Identify trends with respect to the change in seasons.
+* Consider looking into days when the users are likely to get more active.
+* Since this company is focused on women, consider adding a Menstrual Cycle tracker and analyse trends on the users' activity that might have been affected by their cycle.
+
+*Thank You.*
