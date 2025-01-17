@@ -27,7 +27,7 @@ library(here)
 ```
 I will be using these data. They have been viewed at Microsoft Excel and the original files were renamed for convenience.
 ```{r Loading data}
-minute_mets <- read.csv("minute_mets.csv")
+minute_mets <- read.csv("minute_mets.csv") ## cannot upload this file at GitHub. The final file after cleaning has been uploaded insted
 hourly_calories <- read.csv("hourly_calories.csv")
 hourly_intensities <- read.csv("hourly_intensities.csv")
 hourly_steps <- read.csv("hourly_steps.csv")
